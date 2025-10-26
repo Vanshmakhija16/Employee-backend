@@ -2,7 +2,6 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import University from "../models/University.js";
 import Doctor from "../models/Doctor.js";
 import mongoose from "mongoose";
 

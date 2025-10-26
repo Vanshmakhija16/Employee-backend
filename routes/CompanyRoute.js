@@ -4,8 +4,81 @@ import jwt from "jsonwebtoken"
 import User from "../models/User.js"; // ✅ make sure this path is correct!
 import Doctor from "../models/Doctor.js";
 import EmployeeAppointment from "../models/EmployeeAppointment.js";
+import nodemailer from "nodemailer";
+import Employee from "../models/Employee.js";
+
 
 const router = express.Router();
+
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT, 10),
+  secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+const sendEmployeeAppointmentEmail = async (appointment) => {
+  try {
+    const employee = await Employee.findById(appointment.employee);
+    const doctor = await Doctor.findById(appointment.doctor);
+
+    if (!employee || !doctor) return;
+
+    const date = new Date(appointment.slotStart).toLocaleDateString();
+    const startTime = new Date(appointment.slotStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const endTime = new Date(appointment.slotEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const subject = "✅ Your session is confirmed";
+    
+    const employeeText = `
+Hi ${employee.name},
+
+Your session with Dr. ${doctor.name} has been booked successfully.
+
+Date: ${date}
+Time: ${startTime} - ${endTime}
+Mode: ${appointment.mode || "N/A"}
+Notes: ${appointment.notes || "N/A"}
+
+Thank you!
+`;
+
+    const doctorText = `
+Hi Dr. ${doctor.name},
+
+A new session has been booked by ${employee.name}.
+
+Date: ${date}
+Time: ${startTime} - ${endTime}
+Mode: ${appointment.mode || "N/A"}
+Notes: ${appointment.notes || "N/A"}
+
+Please be prepared.
+`;
+
+    // Send emails
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: employee.email,
+      subject,
+      text: employeeText,
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: doctor.email,
+      subject,
+      text: doctorText,
+    });
+
+  } catch (err) {
+    console.error("Failed to send email:", err);
+  }
+};
 
 
 // ✅ Inline authMiddleware
@@ -216,21 +289,17 @@ router.get("/assigned-doctors", async (req, res) => {
 // ✅ Create employee appointment (prevent duplicate bookings)
 router.post("/", async (req, res) => {
   try {
-    const { doctorId, slotStart, slotEnd, notes, mode } = req.body;
+    const { employeeId, doctorId, slotStart, slotEnd, notes, mode } = req.body;
 
-    if (!doctorId || !slotStart || !slotEnd) {
+    if (!employeeId || !doctorId || !slotStart || !slotEnd) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // 🧠 Check if slot is already booked for this doctor
+    // Check if slot is already booked
     const overlappingSession = await EmployeeAppointment.findOne({
       doctor: doctorId,
       $or: [
-        {
-          // start time overlaps with existing slot
-          slotStart: { $lt: slotEnd },
-          slotEnd: { $gt: slotStart },
-        },
+        { slotStart: { $lt: slotEnd }, slotEnd: { $gt: slotStart } },
       ],
     });
 
@@ -240,8 +309,9 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ If no overlap found, create the appointment
+    // Create appointment
     const newAppointment = new EmployeeAppointment({
+      employee: employeeId,  // store employee reference
       doctor: doctorId,
       slotStart,
       slotEnd,
@@ -250,12 +320,18 @@ router.post("/", async (req, res) => {
     });
 
     await newAppointment.save();
-    res.status(201).json({ message: "Employee session booked successfully!" });
+
+    // Send email notifications
+    await sendEmployeeAppointmentEmail(newAppointment);
+
+    res.status(201).json({
+      message: "Employee session booked successfully!",
+      appointment: newAppointment,
+    });
   } catch (err) {
     console.error("Booking failed:", err);
     res.status(500).json({ error: "Failed to create appointment" });
   }
 });
-
 
 export default router;

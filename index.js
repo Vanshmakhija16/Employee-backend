@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 
+import employeeQuestionnaireRoutes from "./routes/employeeQuestionnaireRoutes.js";
 import authRoutes from "./routes/auth.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import doctorRoutes from "./routes/doctorRoutes.js";
@@ -11,9 +12,10 @@ import User from "./models/User.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import assessmentsRoute from "./routes/assessments.js";
-import universityRoutes from "./routes/universityRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import CompanyRoute from "./routes/CompanyRoute.js";
+import employeeAuthRoutes from "./routes/employeeAuthRoutes.js";
+
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -75,9 +77,12 @@ app.use("/api/doctors",doctorRoutes); // auth handled inside doctor.routes if ne
 app.use("/api/appointments", authMiddleware, appointmentRoutes);
 app.use("/api/admin", authMiddleware, adminRoutes);
 app.use("/api/assessments", assessmentsRoute);
-app.use("/api/universities", universityRoutes); 
 app.use("/api/reports", reportRoutes);
 app.use("/api/companies", CompanyRoute);
+app.use("/api/employee", employeeAuthRoutes);
+app.use("/api/employee-questionnaire", employeeQuestionnaireRoutes);
+
+
 
 
 // Get logged-in user info
@@ -91,7 +96,10 @@ app.get("/api/me", authMiddleware, async (req, res) => {
   }
 });
 
+app.get("/api/check",async(req,res)=> {
+      res.status(500).json({ success: true, message: "Backend is running" });
 
+})
 // --------------------
 // MongoDB Connection & Server Start
 // --------------------
