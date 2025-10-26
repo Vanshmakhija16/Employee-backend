@@ -9,7 +9,7 @@ export const authMiddleware = (req, res, next) => {
   if (!token) return res.status(401).json({ success: false, message: "No token provided" });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secretKey");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_secret_key");
     req.userId = decoded.id; // attach user ID to request
     req.userRole = decoded.role || "employee"; // optional role
     next();
@@ -21,7 +21,7 @@ export const authMiddleware = (req, res, next) => {
 const router = express.Router();
 
 // Save questionnaire
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const data = req.body;
     const questionnaire = new EmployeeQuestionnaire({
